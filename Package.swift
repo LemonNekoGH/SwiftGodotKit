@@ -8,8 +8,7 @@ let macLibgodotTarget: Target = .binaryTarget(
 
 let iosLibgodotTarget: Target = .binaryTarget(
     name: "ios_libgodot",
-    url: "https://github.com/migueldeicaza/godot/releases/download/v4.6.3/libgodot-ios.xcframework.zip",
-    checksum: "77c23950bb961529e4ec8d99896a2642e4541424123fcd66d46a5ffa060fdf14"
+    path: "build/ios/libgodot.xcframework"
 )
 
 let package = Package(
@@ -26,7 +25,7 @@ let package = Package(
         .executable(name: "TrivialSample", targets: ["TrivialSample"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/migueldeicaza/SwiftGodot", exact: "0.75.0"),
+        .package(path: "../SwiftGodot"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -37,6 +36,7 @@ let package = Package(
                 "SwiftGodot",
                 "libgodot",
                 .target(name: "apple_plugin_stubs", condition: .when(platforms: [.iOS])),
+                .target(name: "apple_embedded_runtime_bridge", condition: .when(platforms: [.iOS])),
                 .target(name: "mac_libgodot", condition: .when(platforms: [.macOS])),
                 .target(name: "ios_libgodot", condition: .when(platforms: [.iOS])),
             ]
@@ -60,6 +60,11 @@ let package = Package(
         .target(
             name: "apple_plugin_stubs",
             path: "Sources/apple_plugin_stubs",
+            publicHeadersPath: "include"
+        ),
+        .target(
+            name: "apple_embedded_runtime_bridge",
+            path: "Sources/apple_embedded_runtime_bridge",
             publicHeadersPath: "include"
         ),
 

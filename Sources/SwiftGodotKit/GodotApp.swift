@@ -36,8 +36,9 @@ public final class GodotAppViewHandle {
     }
 
     public func isReady() -> Bool {
-        guard let app, let instance = app.instance, instance.isStarted() else { return false }
-        return getRoot() != nil
+        guard let app else { return false }
+        guard app.isRuntimeStarted(), let sceneTree = Engine.getMainLoop() as? SceneTree else { return false }
+        return sceneTree.root != nil
     }
 
     public func emitMessage(_ message: VariantDictionary) {
@@ -94,6 +95,7 @@ public class GodotApp: ObservableObject {
     @ObservationIgnored private var launchSceneOverride: String?
     @ObservationIgnored private var nextViewId: Int64 = 1
     @ObservationIgnored private var lifecycleHasFocus = true
+    @ObservationIgnored private var hostedRenderLoopActive = false
     @ObservationIgnored private var lifecycleIsPaused = false
 
     private enum StartupSource {
@@ -115,7 +117,7 @@ public class GodotApp: ObservableObject {
         godotPackPath: String? = nil,
         renderingDriver: String = "metal",
         renderingMethod: String = "mobile",
-        displayDriver: String = "embedded",
+        displayDriver: String = GodotApp.defaultDisplayDriver,
         extraArgs: [String] = []
     ) {
         let dir = godotPackPath ?? Bundle.main.resourcePath ?? "."
@@ -239,6 +241,7 @@ public class GodotApp: ObservableObject {
             return false
         }
         isPaused = false
+        hostedRenderLoopActive = false
         Logger.App.info("GodotApp.start created instance. isStarted=\(instance.isStarted())")
         
 #if os(macOS)
@@ -262,20 +265,29 @@ public class GodotApp: ObservableObject {
         self.hostBridge = nil
         isPaused = false
         isDrawing = true
+        hostedRenderLoopActive = false
     }
 
     public func pause() {
-        guard let instance else { return }
+        guard isRuntimeStarted() else { return }
         if !isPaused {
-            instance.pause()
+            if let instance, instance.isStarted() {
+                instance.pause()
+            } else {
+                postMainLoopNotification(Int32(MainLoop.notificationApplicationPaused), label: "paused")
+            }
             isPaused = true
         }
     }
 
     public func resume() {
-        guard let instance else { return }
+        guard isRuntimeStarted() else { return }
         if isPaused {
-            instance.resume()
+            if let instance, instance.isStarted() {
+                instance.resume()
+            } else {
+                postMainLoopNotification(Int32(MainLoop.notificationApplicationResumed), label: "resumed")
+            }
             isPaused = false
         }
     }
@@ -301,10 +313,10 @@ public class GodotApp: ObservableObject {
             )
             return
         }
-        guard instance.isStarted() else { return }
+        guard isRuntimeStarted() else { return }
 
         let invoke = { [weak self] in
-            guard let self, let instance = self.instance, instance.isStarted() else { return }
+            guard let self, self.isRuntimeStarted() else { return }
             block()
         }
 
@@ -396,7 +408,7 @@ public class GodotApp: ObservableObject {
     }
 
     private func postMainLoopNotification(_ notification: Int32, label: String) {
-        guard let instance, instance.isStarted() else { return }
+        guard isRuntimeStarted() else { return }
         emitRuntimeEvent(.lifecycle(GodotLifecycleEvent(label: label, notification: notification)))
         runOnGodotThread {
             Engine.getMainLoop()?.notification(what: notification)
@@ -528,7 +540,7 @@ public class GodotApp: ObservableObject {
             var callback = callbacks[id],
             !callback.didSendReady,
             let instance,
-            instance.isStarted(),
+            isRuntimeStarted(),
             let sceneTree = Engine.getMainLoop() as? SceneTree,
             sceneTree.root != nil
         else {
@@ -562,7 +574,7 @@ public class GodotApp: ObservableObject {
     }
 
     private func ensureHostBridgeAttached() -> SwiftGodotHostBridge? {
-        guard let instance, instance.isStarted() else { return nil }
+        guard isRuntimeStarted() else { return nil }
         guard let sceneTree = Engine.getMainLoop() as? SceneTree, let root = sceneTree.root else {
             return nil
         }
@@ -766,4 +778,30 @@ public class GodotApp: ObservableObject {
 
 public extension EnvironmentValues {
     @Entry var godotApp: GodotApp? = nil
+}
+
+extension GodotApp {
+    public static var defaultDisplayDriver: String {
+        #if os(iOS)
+        return "iOS"
+        #else
+        return "embedded"
+        #endif
+    }
+}
+
+extension GodotApp {
+    func setHostedRenderLoopActive(_ active: Bool) {
+        hostedRenderLoopActive = active
+    }
+
+    func isRuntimeStarted() -> Bool {
+        guard instance != nil else { return false }
+        #if os(iOS)
+        if hostedRenderLoopActive {
+            return true
+        }
+        #endif
+        return instance?.isStarted() == true
+    }
 }

@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:SwiftGodotKit}",
+            "name": "Debug TrivialSample",
+            "target": "TrivialSample",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug TrivialSample"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:SwiftGodotKit}",
+            "name": "Release TrivialSample",
+            "target": "TrivialSample",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release TrivialSample"
+        }
+    ]
+}

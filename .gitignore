@@ -10,3 +10,4 @@ DerivedData/
 *.xcframework
 *.a
 *.dylib
+*.xcframework.bak.*
